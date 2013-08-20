@@ -202,6 +202,7 @@ namespace Chordian
             }
             catch (Exception ex)
             {
+                Predecessor = Local;
                 Trace.WriteLine(ex.Message);
             }
         }

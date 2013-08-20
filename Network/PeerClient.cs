@@ -94,7 +94,7 @@ namespace Chordian
                     }
                     else
                     {
-                        tcs.TrySetResult(connectEvent.SocketError);
+                        tcs.TrySetException(new Exception( connectEvent.SocketError.ToString( )));
                         CloseClientSocket(new ConnectedClient(connectEvent.ConnectSocket));
                     }
                 }

@@ -37,7 +37,7 @@ namespace Chordian
         /// </summary>
         /// <param name="seed"></param>
         /// <returns></returns>
-        public async Task Join( ChordLocalPeer seed = null ) 
+        public async Task Join( ChordPeerAddress seed = null ) 
         {
             if (seed == null)
                 throw new ArgumentNullException("seed");
