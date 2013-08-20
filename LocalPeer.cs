@@ -27,7 +27,7 @@ namespace Chordian
                     listenTask =>
                     {
                         if (listenTask.IsFaulted)
-                            Console.WriteLine(listenTask.Exception.Message);
+                            Trace.WriteLine(listenTask.Exception.Message);
                     }
                 );
         }
@@ -44,12 +44,12 @@ namespace Chordian
 
             using (PeerClient peerClient = new PeerClient(seed.IP, seed.Port)) //open a connection to the seed
             {
-                Console.WriteLine("Client start...Join");
+                Trace.WriteLine("Client start...Join");
                 await peerClient.ConnectAsync(new MessageChordFindSuccessor(this.Key)); //find successor
                 MessageChordFindSuccessorReply reply = await peerClient.ReceiveAsync() as MessageChordFindSuccessorReply;
                 Successor = reply.Successor; //update successor
                 await peerClient.DisconnectAsync(); //cleanly disconnect
-                Console.WriteLine("Client end...Join");
+                Trace.WriteLine("Client end...Join");
             }
         }
 

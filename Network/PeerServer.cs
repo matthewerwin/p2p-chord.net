@@ -27,39 +27,34 @@ namespace Chordian
 
     public class ConnectedClient : IDisposable
     {
-        public Socket ConnectedSocket { get; private set; }
+        public Socket Socket { get; private set; }
         public ConnectedClient(Socket clientSocket)
         {
-            ConnectedSocket = clientSocket;
+            Socket = clientSocket;
         }
 
-        public bool Connected
+        public bool finalized = false;
+        ~ConnectedClient()
         {
-            get
+            lock (this)
             {
-                lock (this)
+                if (Socket != null)
                 {
-                    if (ConnectedSocket != null)
-                        return ConnectedSocket.Connected;
-                    return false;
+                    Socket.Close();
+                    Socket = null;
+                    GC.SuppressFinalize(this);
                 }
             }
         }
 
-        public void Dispose(bool finalizer)
+        public void Dispose()
         {
             lock (this)
             {
-                if (ConnectedSocket != null)
+                if (Socket != null)
                 {
-                    ConnectedSocket.Shutdown(SocketShutdown.Both);
-                    ConnectedSocket.Close();
-
-                    if (finalizer)
-                    {
-                        using (ConnectedSocket) { }
-                        ConnectedSocket = null;
-                    }
+                    if (Socket.Connected)
+                        Socket.Shutdown(SocketShutdown.Both);
                 }
             }
         }

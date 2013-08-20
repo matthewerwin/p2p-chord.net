@@ -24,7 +24,7 @@ namespace Chordian
         protected const int MAX_CONNECTIONS = int.MaxValue / 2;
 
         //to avoid fragmenting memory we utilize same size for all operations        
-        protected const int POOL_BUFFER_SIZE = 10 * 1024;
+        protected readonly int POOL_BUFFER_SIZE = (int) Math.Pow(2, LTF_BYTE_COUNT * 8);
 
         protected SocketAsyncEventArgsPool EventArgsPool { get; set; }
         private BufferManager BufferPool { get; set; }
@@ -74,7 +74,7 @@ namespace Chordian
                 SocketAsyncEventArgs receiveEvent = EventArgsPool.TakeItem(tcs);
                 try
                 {
-                    receiveEvent.AcceptSocket = clientSocket.ConnectedSocket;
+                    receiveEvent.AcceptSocket = clientSocket.Socket;
                     receiveEvent.Completed += OnReceiveLTFEventHandler;
                     receiveEvent.SetBuffer(BufferPool.TakeBuffer(POOL_BUFFER_SIZE), 0, LTF_BYTE_COUNT);
                     if (!receiveEvent.AcceptSocket.ReceiveAsync(receiveEvent))
@@ -94,7 +94,7 @@ namespace Chordian
                 SocketAsyncEventArgs sendEvent = EventArgsPool.TakeItem(tcs);
                 try
                 {
-                    sendEvent.AcceptSocket = clientSocket.ConnectedSocket;
+                    sendEvent.AcceptSocket = clientSocket.Socket;
                     sendEvent.Completed += OnSendEventHandler;
                     SerializeMessage(sendEvent, message);
 
@@ -198,8 +198,11 @@ namespace Chordian
                 if (receiveEvent.SocketError != SocketError.Success //error condition
                     || receiveEvent.BytesTransferred <= 0) //remote side closed the connection
                 {
-                    tcs.TrySetResult(null);
-                    try { CloseClientSocket(tcs.Task.AsyncState as ConnectedClient); }
+                    try 
+                    { 
+                        tcs.TrySetResult(null); 
+                        CloseClientSocket(tcs.Task.AsyncState as ConnectedClient); 
+                    }
                     finally { RecycleEventArgs(receiveEvent); }
                 }
                 else
@@ -256,7 +259,7 @@ namespace Chordian
                 SocketAsyncEventArgs disconnectEvent = EventArgsPool.TakeItem(tcs);
                 try
                 {
-                    disconnectEvent.AcceptSocket = clientSocket.ConnectedSocket;
+                    disconnectEvent.AcceptSocket = clientSocket.Socket;
                     // REMARK: This is for high-velocity testing scenarios where machine may run out of
                     //         available sockets due to TIME_WAIT
                     //disconnectEvent.DisconnectReuseSocket = true;
@@ -287,75 +290,54 @@ namespace Chordian
             }
         }
 
-        //protected void CloseClientSocket(SocketAsyncEventArgs eventArgs)
-        //{
-        //    CloseClientSocket(new ConnectedClient(eventArgs.AcceptSocket));
-        //}
-
         protected void CloseClientSocket(ConnectedClient client)
         {
             if (client != null)
-                using (client) { }
+                client.Dispose();
 
             if( this is PeerServer )
-                Console.WriteLine("Server Closed socket.");
+                Trace.WriteLine("Server Closed socket.");
             else
-                Console.WriteLine("Client Closed socket.");
+                Trace.WriteLine("Client Closed socket.");
         }
 
         protected void RecycleEventArgs(SocketAsyncEventArgs eventArgs)
         {
-            bool isPooledBuffer = false;
-            //detach any event handlers
-            switch (eventArgs.LastOperation)
+            try
             {
-                case SocketAsyncOperation.Accept:
-                    if( OnAcceptEventHandler != null )
-                        eventArgs.Completed -= OnAcceptEventHandler;
-                    break;
-                case SocketAsyncOperation.Connect:
-                    if( OnConnectEventHandler != null )
-                        eventArgs.Completed -= OnConnectEventHandler;
-                    break;
-                case SocketAsyncOperation.Disconnect:
-                    if( OnDisconnectEventHandler != null )
-                        eventArgs.Completed -= OnDisconnectEventHandler;
-                    break;
-                case SocketAsyncOperation.Receive:
-                    isPooledBuffer = eventArgs.Buffer.Length == POOL_BUFFER_SIZE || eventArgs.Buffer.Length == POOL_BUFFER_SIZE;
+                if (OnAcceptEventHandler != null)
+                    eventArgs.Completed -= OnAcceptEventHandler;
+                if (OnConnectEventHandler != null)
+                    eventArgs.Completed -= OnConnectEventHandler;
+                if (OnDisconnectEventHandler != null)
+                    eventArgs.Completed -= OnDisconnectEventHandler;
+
+                if (OnReceiveLTFEventHandler != null)
                     eventArgs.Completed -= OnReceiveLTFEventHandler; //in case it was recycled during LTF
+                if (OnReceiveEventHandler != null)
                     eventArgs.Completed -= OnReceiveEventHandler;
-                    break;
-                case SocketAsyncOperation.Send:
-                    isPooledBuffer = eventArgs.Buffer.Length == POOL_BUFFER_SIZE;
+                if (OnSendEventHandler != null)
                     eventArgs.Completed -= OnSendEventHandler;
-                    break;
-                default:
-                    throw new Exception("Unrecognized LastOperation property for recycled event args");
-            }
 
-            if (eventArgs.AcceptSocket != null)
+                //release any managed buffers to the pool
+                if (eventArgs.Buffer != null && eventArgs.Buffer.Length == POOL_BUFFER_SIZE)
+                    BufferPool.ReturnBuffer(eventArgs.Buffer);
+
+                if (eventArgs.UserToken != null)
+                    eventArgs.UserToken = null;
+
                 eventArgs.AcceptSocket = null;
+                eventArgs.SetBuffer(null, 0, 0);
+                eventArgs.BufferList = null;
 
-            //release any managed buffers to the pool
-            if ( isPooledBuffer )
-                BufferPool.ReturnBuffer(eventArgs.Buffer);
-
-            if (eventArgs.UserToken != null)
-                eventArgs.UserToken = null;
-
-            eventArgs.AcceptSocket = null;
-            eventArgs.SetBuffer(null, 0, 0);
-            eventArgs.BufferList = null;
-
-            //return the event args to the pool
-            EventArgsPool.ReturnItem(eventArgs);
+            }
+            finally { EventArgsPool.ReturnItem(eventArgs); }
         }
 
         public void Dispose()
         {
             BufferPool.Clear();
-            EventArgsPool.Clear();
+            EventArgsPool.Dispose();
         }
     }
 }

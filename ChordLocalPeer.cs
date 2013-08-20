@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -11,7 +12,7 @@ namespace Chordian
     {
         //key-size determines maximum size of network (2^64 is a world-encompassing 18 quintillion)
         public const int KEY_SIZE = 64;
-        public const int MAINTENANCE_INTERVAL = 20000;
+        public const int MAINTENANCE_INTERVAL = 150;
 
         public ChordPeerAddress Local { get; private set; } //for simplicity
         public ChordPeerAddress Successor 
@@ -31,6 +32,8 @@ namespace Chordian
         {
             Local = new ChordPeerAddress(ip, port);
             FingerTable = new ChordPeerAddress[KEY_SIZE];
+            for (int i = 0; i < FingerTable.Length; i++)
+                FingerTable[i] = Local;
 
             MaintenanceTimer = new Timer(MAINTENANCE_INTERVAL);
             MaintenanceTimer.Elapsed += RunMaintenance;
@@ -60,6 +63,11 @@ namespace Chordian
                 if (Predecessor == Local || Utilities.IsKeyInRange(msg.Peer.Key, Predecessor.Key, Local.Key))
                     Predecessor = msg.Peer;
             }
+            else if (message is MessageChordPing) //effectively check_predecessor()
+            {
+                MessageChordPing msg = message as MessageChordPing;
+                return new MessageChordPingReply();
+            }
 
             return null;
         }
@@ -76,11 +84,11 @@ namespace Chordian
                 {
                     using (PeerClient peerClient = new PeerClient(successor.IP, successor.Port)) //open a connection to responsible party
                     {
-                        Console.WriteLine("Client start...FindSuccessor");
+                        Trace.WriteLine("Client start...FindSuccessor");
                         await peerClient.ConnectAsync(message);
                         MessageChordFindSuccessorReply reply = await peerClient.ReceiveAsync() as MessageChordFindSuccessorReply;
                         await peerClient.DisconnectAsync(); //cleanly disconnect
-                        Console.WriteLine("Client done...FindSuccessor");
+                        Trace.WriteLine("Client done...FindSuccessor");
                         return reply.Successor;
                     }
                 }
@@ -112,12 +120,12 @@ namespace Chordian
                 {
                     if (MaintenanceInProgress == true)
                     {
-                        Console.WriteLine("Maintenance is already in progress.");
+                        Trace.WriteLine("Maintenance is already in progress.");
                         return;
                     }
                     else MaintenanceInProgress = true;
                 }
-                Console.WriteLine(DateTime.Now.ToShortTimeString() + ": Starting Maintenance...");
+                Trace.WriteLine(DateTime.Now.ToShortTimeString() + ": Starting Maintenance...");
                 Task stabilize = Stabilize();
                 Task fixFingers = FixFingers();
                 Task checkPredecessor = CheckPredecessor();
@@ -125,7 +133,7 @@ namespace Chordian
             }
             catch (Exception ex)
             {
-                Console.WriteLine(ex.Message);
+                Trace.WriteLine(ex.Message);
             }
         }
 
@@ -141,7 +149,7 @@ namespace Chordian
             {
                 using (PeerClient peerClient = new PeerClient(Successor.IP, Successor.Port)) //open a connection to our Successor
                 {
-                    Console.WriteLine("Client start...Stabilize");
+                    //Trace.WriteLine("Client start...Stabilize");
                     //x = successor.predecessor
                     await peerClient.ConnectAsync(new MessageChordGetPredecessor(this.Key));
                     MessageChordGetPredecessorReply reply = await peerClient.ReceiveAsync() as MessageChordGetPredecessorReply;
@@ -153,12 +161,12 @@ namespace Chordian
                     //successor.notify(n)
                     await peerClient.SendAsync(new MessageChordNotify(Local)); 
                     await peerClient.DisconnectAsync(); //cleanly disconnect
-                    Console.WriteLine("Client end...Stabilize");
+                    Trace.WriteLine("Client end...Stabilize");
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine(ex.Message); 
+                Trace.WriteLine(ex.Message); 
             }
         }
 
@@ -168,13 +176,13 @@ namespace Chordian
             try
             {
                 //finger[next] = find_successor(n + 2^(next-1))
-                Console.WriteLine("Fix Finger: " + _fingerToVerify);
+                //Trace.WriteLine("Fix Finger: " + _fingerToVerify);
                 UInt64 targetKey = this.Key + (UInt64)Math.Pow(2, _fingerToVerify);
                 await FindSuccessor(new MessageChordFindSuccessor(targetKey));
             }
             catch (Exception ex) 
             {
-                Console.WriteLine(ex.Message);
+                Trace.WriteLine(ex.Message);
             }
             finally { _fingerToVerify = (_fingerToVerify + 1) % FingerTable.Length; }
         }
@@ -185,17 +193,16 @@ namespace Chordian
             {
                 using (PeerClient peerClient = new PeerClient(Predecessor.IP, Predecessor.Port)) //open a connection to our Predecessor
                 {
-                    Console.WriteLine("Client start...CheckPredecessor");
+                    //Trace.WriteLine("Client start...CheckPredecessor");
                     await peerClient.ConnectAsync(new MessageChordPing());
                     MessageChordPingReply reply = await peerClient.ReceiveAsync() as MessageChordPingReply;
-                    // TO DO: determine if predecessor changed
                     await peerClient.DisconnectAsync();
-                    Console.WriteLine("Client end...CheckPredecessor");
+                    //Trace.WriteLine("Client end...CheckPredecessor");
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine(ex.Message);
+                Trace.WriteLine(ex.Message);
             }
         }
 

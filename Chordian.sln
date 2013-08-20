@@ -3,8 +3,6 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 2012
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Chordian", "Chordian.csproj", "{C0B0D1F1-F05A-4913-8B5C-AB20B77E6841}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Chordian.Test", "..\Chordian.Test\Chordian.Test.csproj", "{157BBF46-9109-47AF-B858-D119B456E5C4}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -15,10 +13,6 @@ Global
 		{C0B0D1F1-F05A-4913-8B5C-AB20B77E6841}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{C0B0D1F1-F05A-4913-8B5C-AB20B77E6841}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{C0B0D1F1-F05A-4913-8B5C-AB20B77E6841}.Release|Any CPU.Build.0 = Release|Any CPU
-		{157BBF46-9109-47AF-B858-D119B456E5C4}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{157BBF46-9109-47AF-B858-D119B456E5C4}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{157BBF46-9109-47AF-B858-D119B456E5C4}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{157BBF46-9109-47AF-B858-D119B456E5C4}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

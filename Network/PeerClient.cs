@@ -33,7 +33,7 @@ namespace Chordian
 
         public async Task SendAsync( Message message )
         {
-            if (ConnectedSocket == null || !ConnectedSocket.ConnectedSocket.Connected)
+            if (ConnectedSocket == null || !ConnectedSocket.Socket.Connected)
                 throw new Exception("Client is not connected");
 
             await SendMessageAsync(ConnectedSocket, message);
@@ -41,7 +41,7 @@ namespace Chordian
 
         public async Task<Message> ReceiveAsync( )
         {
-            if (ConnectedSocket == null || !ConnectedSocket.ConnectedSocket.Connected)
+            if (ConnectedSocket == null || !ConnectedSocket.Socket.Connected)
                 throw new Exception("Client is not connected");
 
             return await ReceiveMessageAsync(ConnectedSocket);
@@ -67,10 +67,10 @@ namespace Chordian
 
                     IPEndPoint ipEndPoint = new IPEndPoint(IP, Port);
                     connectEvent.RemoteEndPoint = ipEndPoint;
-                    connectEvent.AcceptSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-                    connectEvent.AcceptSocket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.NoDelay, true); // no NAGLE since we're acting like UDP
+                    Socket socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+                    socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.NoDelay, true); // no NAGLE since we're acting like UDP
 
-                    if (!connectEvent.AcceptSocket.ConnectAsync(connectEvent))
+                    if (!socket.ConnectAsync(connectEvent))
                         OnConnect(null, connectEvent); //synchronous completion
                 }
                 catch { RecycleEventArgs(connectEvent); throw; }

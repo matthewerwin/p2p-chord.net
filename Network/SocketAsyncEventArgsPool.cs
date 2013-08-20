@@ -3,17 +3,22 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net.Sockets;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Chordian
 {
-    public class SocketAsyncEventArgsPool
+    public class SocketAsyncEventArgsPool : IDisposable
     {
         Stack<SocketAsyncEventArgs> eventArgsPool;
         public SocketAsyncEventArgsPool(int capacity)
         {
             eventArgsPool = new Stack<SocketAsyncEventArgs>();
         }
+
+        public int TotalCreated = 0;
+        public int TotalReturned = 0;
+        public int TotalOutstanding = 0;
 
         public void ReturnItem(SocketAsyncEventArgs item)
         {
@@ -26,20 +31,34 @@ namespace Chordian
             if (item.UserToken != null)
                 throw new ArgumentException("UserToken is not null on return to pool");
 
-            lock (eventArgsPool)
-                eventArgsPool.Push(item);
+
+            lock (this)
+            {
+                if (eventArgsPool == null)
+                    item.Dispose();
+                else
+                {
+                    Interlocked.Decrement(ref TotalOutstanding);
+                    TotalReturned++;
+                    eventArgsPool.Push(item);
+                }
+            }
         }
 
         public SocketAsyncEventArgs TakeItem(object userToken)
         {
-            lock (eventArgsPool)
+            lock (this)
             {
                 SocketAsyncEventArgs eventArgs;
-                if (eventArgsPool.Count == 0)
+                if (eventArgsPool == null || eventArgsPool.Count == 0)
+                {
                     eventArgs = new SocketAsyncEventArgs();
+                    TotalCreated++;
+                }
                 else
                     eventArgs = eventArgsPool.Pop();
 
+                Interlocked.Increment(ref TotalOutstanding);
                 eventArgs.UserToken = userToken;
                 return eventArgs;
             }
@@ -49,15 +68,30 @@ namespace Chordian
         {
             get 
             { 
-                lock(eventArgsPool) 
-                    return eventArgsPool.Count; 
+                lock(this) 
+                    return eventArgsPool != null ? eventArgsPool.Count : 0; 
             }
         }
 
         public void Clear()
         {
-            lock (eventArgsPool)
+            lock (this)
+            {
+                if (eventArgsPool == null) return;
+
+                foreach (var item in eventArgsPool)
+                    item.Dispose();
                 eventArgsPool.Clear();
+            }
+        }
+
+        public void Dispose()
+        {
+            lock(this)
+            {
+                Clear();
+                eventArgsPool = null;
+            }
         }
     }
 }
