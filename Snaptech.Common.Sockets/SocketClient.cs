@@ -12,19 +12,29 @@ namespace Snaptech.Common.Sockets
 {
     public class SocketClient : SocketBase
     {
+		public EventHandler OnConnectedEventHandler { get; set; }
+
         /// <summary>
         /// TO DO: make sure this gets disposed!
         /// </summary>
         private ConnectedClient ConnectedSocket { get; set; }
 
+		/// <summary>
+		/// Create a new listening server on IP:Port and hook into delegates for send/receive
+		/// </summary>
+		/// <param name="endPoint">End point to bind to</param>
+		/// <param name="message">Message to for deserialization</param>
+		public SocketClient(EndPoint endPoint, IMessage message) : 
+			base(endPoint, true, message)
+		{
+			OnConnectEventHandler = new EventHandler<SocketAsyncEventArgs>(OnConnect);
+		}
 
         /// <summary>
         /// Create a new listening server on IP:Port and hook into delegates for send/receive
         /// </summary>
         /// <param name="ip">Address to bind to</param>
         /// <param name="port">Port to bind to</param>
-        /// <param name="messageSentHandler">Consider an interface vs a delegate</param>
-        /// <param name="messageReceivedHandler">Consider an interface vs a delegate</param>
         public SocketClient(string ip, int port, IMessage message) :
             base(IPAddress.Parse(ip), port, false, message)
         {
@@ -76,8 +86,7 @@ namespace Snaptech.Common.Sockets
                     if (message != null)
                         base.SerializeMessage(connectEvent, message);
 
-                    IPEndPoint ipEndPoint = new IPEndPoint(IP, Port);
-                    connectEvent.RemoteEndPoint = ipEndPoint;
+                    connectEvent.RemoteEndPoint = EndPoint;
                     Socket socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
                     socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.NoDelay, true); // no NAGLE since we're acting like UDP
 
@@ -115,6 +124,9 @@ namespace Snaptech.Common.Sockets
 
 						if (taskToken != null)
 							ContinouslyReceive(taskToken, new ConnectedClient(connectEvent.ConnectSocket));
+
+						if (OnConnectedEventHandler != null)
+							OnConnectedEventHandler(sender, null);
                     }
                     else
                     {
@@ -127,7 +139,7 @@ namespace Snaptech.Common.Sockets
             catch (Exception ex) { tcs.TrySetException(ex); }
         }
 
-		private void ContinouslyReceive(TaskToken lt, ConnectedClient clientSocket)
+		private void ContinouslyReceive(TaskToken taskToken, ConnectedClient clientSocket)
 		{
 			try
 			{
@@ -141,8 +153,8 @@ namespace Snaptech.Common.Sockets
 								 IMessage message = x.Result;
 								 if (message != null)
 								 {
-									 ContinouslyReceive(lt, clientSocket);
-									 try { lt.MessageHandler(clientSocket, message); }
+									 ContinouslyReceive(taskToken, clientSocket);
+									 try { taskToken.MessageHandler(clientSocket, message); }
 									 catch { } //eat any exception that's unhandled by the delegate! 
 								 }
 							 }
@@ -150,20 +162,20 @@ namespace Snaptech.Common.Sockets
 							 {
 								 CloseClientSocket(clientSocket);
 								 if (x.IsFaulted)
-									 lt.TaskCompletionSource.TrySetException(x.Exception);
+									 taskToken.TaskCompletionSource.TrySetException(x.Exception);
 								 else if (x.IsCanceled)
-									 lt.TaskCompletionSource.TrySetCanceled();
+									 taskToken.TaskCompletionSource.TrySetCanceled();
 							 }
 						 }
 						 catch (Exception ex)
 						 {
 							 try { CloseClientSocket(clientSocket); }
 							 catch { }
-							 lt.TaskCompletionSource.TrySetException(ex);
+							 taskToken.TaskCompletionSource.TrySetException(ex);
 						 }
 					 });
 			}
-			catch (Exception ex) { lt.TaskCompletionSource.TrySetException(ex); }
+			catch (Exception ex) { taskToken.TaskCompletionSource.TrySetException(ex); }
 		}
 
         public new void Dispose()

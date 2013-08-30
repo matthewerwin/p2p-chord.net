@@ -36,9 +36,11 @@ namespace Snaptech.Common.Sockets
         private EventHandler<SocketAsyncEventArgs> OnReceiveEventHandler { get; set; }
         private EventHandler<SocketAsyncEventArgs> OnSendEventHandler { get; set; }
 
-        public IPAddress IP { get; private set; }
-        public int Port { get; private set; }
-		private IMessage Message;
+        public EndPoint EndPoint { get; private set; }
+        private IMessage Message;
+
+		public SocketBase(IPAddress ipAddress, int port, bool listen, IMessage message, int bufferSize = 0) : this(new IPEndPoint(ipAddress, port), listen, message, bufferSize)
+		{ }
 
         /// <summary>
         /// Create a new listening server on IP:Port and hook into delegates for send/receive
@@ -47,10 +49,9 @@ namespace Snaptech.Common.Sockets
         /// <param name="port">Port to bind to</param>
         /// <param name="messageSentHandler">Consider an interface vs a delegate</param>
         /// <param name="messageReceivedHandler">Consider an interface vs a delegate</param>
-        public SocketBase(IPAddress ip, int port, bool listen, IMessage message, int bufferSize = 0)
+        public SocketBase(EndPoint endPoint, bool listen, IMessage message, int bufferSize = 0)
         {
-            IP = ip;
-            Port = port;
+			EndPoint = endPoint;
 			Message = message;
 
 			if (bufferSize > 0)

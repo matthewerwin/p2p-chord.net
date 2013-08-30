@@ -17,23 +17,30 @@ namespace Snaptech.Common.Sockets
     {
         private Socket ListeningSocket { get; set; }
 
+		/// <summary>
+		/// Create a new listening server on IP:Port and hook into delegates for send/receive
+		/// </summary>
+		/// <param name="endPoint">End point to bind to</param>
+		/// <param name="message">Message to for deserialization</param>
+		public SocketServer(EndPoint endPoint, IMessage message) : 
+			base(endPoint, true, message)
+		{
+			OnAcceptEventHandler = new EventHandler<SocketAsyncEventArgs>(OnAccept);
+		}
+
         /// <summary>
         /// Create a new listening server on IP:Port and hook into delegates for send/receive
         /// </summary>
         /// <param name="ip">Address to bind to</param>
         /// <param name="port">Port to bind to</param>
-        /// <param name="messageSentHandler">Consider an interface vs a delegate</param>
-        /// <param name="messageReceivedHandler">Consider an interface vs a delegate</param>
-        public SocketServer(string ip, int port, IMessage message) :
-            base( string.IsNullOrWhiteSpace(ip) ? IPAddress.Any : IPAddress.Parse(ip), port, true, message)
-        {
-            OnAcceptEventHandler = new EventHandler<SocketAsyncEventArgs>(OnAccept);
-        }
+		/// <param name="message">Message to for deserialization</param>
+        public SocketServer(string ipAddress, int port, IMessage message) :
+			this(new IPEndPoint(string.IsNullOrWhiteSpace(ipAddress) ? IPAddress.Any : IPAddress.Parse(ipAddress), port), message)
+        { }
 
         public SocketServer(int port, IMessage message)
-            : this(null, port, message)
-        {
-        }
+            : this(new IPEndPoint(IPAddress.Any, port), message)
+        { }
 
         public Task ListenAsync(Func<ConnectedClient,IMessage,Task> messageHandler)
         {
@@ -43,8 +50,8 @@ namespace Snaptech.Common.Sockets
                 ListeningSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
                 ListeningSocket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.NoDelay, true); // no NAGLE since we're acting like UDP
 
-                IPEndPoint ipEndPoint = new IPEndPoint(IP, Port);
-                ListeningSocket.Bind(ipEndPoint);
+				EndPoint endPoint = base.EndPoint;
+				ListeningSocket.Bind(endPoint);
                 ListeningSocket.Listen(MAX_CONNECTIONS);
 
                 for (int i = 0; i < Environment.ProcessorCount * 2; i++)

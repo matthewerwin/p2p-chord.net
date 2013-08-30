@@ -12,6 +12,7 @@ namespace Snaptech.Common.Sockets
 {
 	public interface IMessage
 	{
+		dynamic Key { get; }
 		MemoryStream Serialize();
 		IMessage Deserialize(SocketAsyncEventArgs args);
 	}
@@ -19,6 +20,8 @@ namespace Snaptech.Common.Sockets
     [Serializable]
     public abstract class MessageBase : IMessage
     {
+		public virtual dynamic Key { get { return this.GetHashCode(); } }
+
 		public virtual MemoryStream Serialize()
         {
             MemoryStream ms = new MemoryStream();
